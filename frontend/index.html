@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>МФЦ Онлайн — Электронная очередь</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="logo" onclick="showPage('home')" style="cursor:pointer">🏛 МФЦ Онлайн</div>
+      <nav id="nav-auth">
+        <button class="btn-link" onclick="showPage('login')">Войти</button>
+        <button class="btn-secondary" onclick="showPage('register')">Регистрация</button>
+      </nav>
+      <nav id="nav-user" style="display:none">
+        <span id="nav-username"></span>
+        <button class="btn-link" onclick="showPage('lk')">Личный кабинет</button>
+        <button class="btn-link" onclick="window.location='/admin.html'">⚙️ Админ</button>
+        <button class="btn-link" onclick="doLogout()">Выйти</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ГЛАВНАЯ / ВЫБОР ФИЛИАЛА -->
+  <div id="page-home" class="page">
+    <div class="hero">
+      <h1>Запись в МФЦ онлайн</h1>
+      <p>Выберите филиал, удобное время и услугу — без очередей</p>
+    </div>
+    <div class="container">
+      <h2>Филиалы МФЦ</h2>
+      <div id="branches-list" class="cards-grid"></div>
+    </div>
+  </div>
+
+  <!-- СЛОТЫ -->
+  <div id="page-slots" class="page" style="display:none">
+    <div class="container">
+      <button class="btn-back" onclick="showPage('home')">← Назад</button>
+      <h2 id="slots-branch-name"></h2>
+      <p id="slots-branch-address" class="muted"></p>
+
+      <h3>Выберите дату и время</h3>
+      <div id="slots-calendar"></div>
+    </div>
+  </div>
+
+  <!-- ФОРМА БРОНИРОВАНИЯ -->
+  <div id="page-book" class="page" style="display:none">
+    <div class="container narrow">
+      <button class="btn-back" onclick="showPage('slots')">← Назад</button>
+      <h2>Бронирование</h2>
+
+      <div class="info-card">
+        <div><span class="label">Филиал:</span> <span id="book-branch"></span></div>
+        <div><span class="label">Дата:</span> <span id="book-date"></span></div>
+        <div><span class="label">Время:</span> <span id="book-time"></span></div>
+      </div>
+
+      <div class="form-group">
+        <label>Услуга</label>
+        <select id="book-service"></select>
+      </div>
+      <div class="form-group">
+        <label>ФИО</label>
+        <input id="book-fullname" type="text" placeholder="Иванов Иван Иванович">
+      </div>
+      <div class="form-group">
+        <label>Цель визита</label>
+        <input id="book-purpose" type="text" placeholder="Кратко опишите цель">
+      </div>
+      <button class="btn-primary full-width" onclick="submitBooking()">Забронировать</button>
+      <div id="book-error" class="error-msg"></div>
+    </div>
+  </div>
+
+  <!-- ЛИЧНЫЙ КАБИНЕТ -->
+  <div id="page-lk" class="page" style="display:none">
+    <div class="container">
+      <h2>Мои записи</h2>
+      <button class="btn-primary" onclick="showPage('home')" style="margin-bottom:20px">+ Новая запись</button>
+      <div id="lk-list"></div>
+    </div>
+  </div>
+
+  <!-- ПЕРЕНОС -->
+  <div id="page-reschedule" class="page" style="display:none">
+    <div class="container">
+      <button class="btn-back" onclick="showPage('lk')">← Назад</button>
+      <h2>Перенос записи</h2>
+      <p class="muted">Выберите новое время в том же филиале</p>
+      <div id="reschedule-calendar"></div>
+    </div>
+  </div>
+
+  <!-- ВХОД -->
+  <div id="page-login" class="page" style="display:none">
+    <div class="container narrow center-form">
+      <h2>Вход</h2>
+      <div class="form-group">
+        <label>Логин</label>
+        <input id="login-username" type="text" placeholder="Ваш логин">
+      </div>
+      <div class="form-group">
+        <label>Пароль</label>
+        <input id="login-password" type="password" placeholder="Пароль">
+      </div>
+      <button class="btn-primary full-width" onclick="doLogin()">Войти</button>
+      <div id="login-error" class="error-msg"></div>
+      <p class="center-text">Нет аккаунта? <a href="#" onclick="showPage('register')">Зарегистрироваться</a></p>
+    </div>
+  </div>
+
+  <!-- РЕГИСТРАЦИЯ -->
+  <div id="page-register" class="page" style="display:none">
+    <div class="container narrow center-form">
+      <h2>Регистрация</h2>
+      <div class="form-group">
+        <label>Логин</label>
+        <input id="reg-username" type="text" placeholder="Придумайте логин">
+      </div>
+      <div class="form-group">
+        <label>Пароль</label>
+        <input id="reg-password" type="password" placeholder="Придумайте пароль">
+      </div>
+      <div class="form-group">
+        <label>ФИО</label>
+        <input id="reg-fullname" type="text" placeholder="Иванов Иван Иванович">
+      </div>
+      <div class="form-group">
+        <label>Телефон</label>
+        <input id="reg-phone" type="text" placeholder="+7 900 000 00 00">
+      </div>
+      <button class="btn-primary full-width" onclick="doRegister()">Зарегистрироваться</button>
+      <div id="reg-error" class="error-msg"></div>
+      <p class="center-text">Уже есть аккаунт? <a href="#" onclick="showPage('login')">Войти</a></p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
