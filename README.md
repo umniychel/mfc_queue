@@ -1,27 +1,7 @@
-# 🏛 МФЦ Онлайн — Электронная очередь
-
-Веб-приложение для онлайн-записи в МФЦ. Позволяет выбрать филиал, услугу и удобное время без очередей.
-
-## Возможности
-
-- Регистрация и вход по логину/паролю
-- Просмотр филиалов с уровнем загруженности
-- Выбор даты и времени из доступных слотов
-- Управление записями в личном кабинете (отмена, перенос)
-- Админ-панель: управление филиалами, услугами, слотами и бронями
-
-## Технологии
-
-- **Backend:** Python, Django
-- **Frontend:** Vanilla JS, HTML, CSS (без фреймворков)
-- **База данных:** SQLite
-
-## Установка и запуск
-
 ### 1. Клонировать репозиторий
 
 ```bash
-git clone https://github.com/your-username/mfc_queue.git
+git clone https://github.com/umniychel/mfc_queue.git
 cd mfc_queue
 ```
 
@@ -72,30 +52,3 @@ python manage.py runserver
 | Логин | Пароль |
 |-------|--------|
 | admin | admin123 |
-
-## Структура проекта
-
-```
-mfc_queue/
-├── booking/
-│   ├── migrations/
-│   ├── services/
-│   ├── views/
-│   │   ├── auth_views.py
-│   │   ├── booking_views.py
-│   │   ├── branch_views.py
-│   │   ├── slot_views.py
-│   │   └── admin_views.py
-│   ├── models.py
-│   └── urls.py
-├── frontend/
-│   ├── index.html
-│   ├── admin.html
-│   ├── app.js
-│   └── style.css
-├── mfc_queue/
-│   ├── settings.py
-│   └── urls.py
-├── seed.py
-└── manage.py
-```
