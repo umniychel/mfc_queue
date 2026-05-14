@@ -53,5 +53,6 @@ class Booking(models.Model):
     status = models.CharField(max_length=20, choices=STATUS, default='pending')
     token = models.UUIDField(default=uuid.uuid4, unique=True)
 
+    slots_count = models.IntegerField(default=1)  # кол-во 30-мин блоков
     created_at = models.DateTimeField(auto_now_add=True)
     confirmed_at = models.DateTimeField(null=True, blank=True)

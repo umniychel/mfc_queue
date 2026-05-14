@@ -17,7 +17,6 @@
       <nav id="nav-user" style="display:none">
         <span id="nav-username"></span>
         <button class="btn-link" onclick="showPage('lk')">Личный кабинет</button>
-        <button class="btn-link" onclick="window.location='/admin.html'">⚙️ Админ</button>
         <button class="btn-link" onclick="doLogout()">Выйти</button>
       </nav>
     </div>
@@ -43,6 +42,10 @@
       <p id="slots-branch-address" class="muted"></p>
 
       <h3>Выберите дату и время</h3>
+      <div class="form-group" style="max-width:320px;margin-bottom:20px">
+        <label>Услуга (фильтр по длительности)</label>
+        <select id="slot-service-filter"></select>
+      </div>
       <div id="slots-calendar"></div>
     </div>
   </div>
@@ -110,6 +113,9 @@
       <button class="btn-primary full-width" onclick="doLogin()">Войти</button>
       <div id="login-error" class="error-msg"></div>
       <p class="center-text">Нет аккаунта? <a href="#" onclick="showPage('register')">Зарегистрироваться</a></p>
+      <p class="center-text" style="margin-top:24px;padding-top:16px;border-top:1px solid #eee">
+        <a href="/admin.html" style="color:#aaa;font-size:0.8rem">Вход для сотрудников</a>
+      </p>
     </div>
   </div>
 

@@ -3,24 +3,24 @@ const API = 'http://127.0.0.1:8000/api';
 let currentUser = null;
 let selectedBranch = null;
 let selectedSlot = null;
+let allSlots = [];         // все слоты текущего филиала
+let allServices = [];      // все услуги
+let selectedSlotsNeeded = 1;
 let rescheduleToken = null;
-let rescheduleOldBranchId = null;
+let rescheduleBooking = null;
 
-// ─── INIT ───────────────────────────────────────────────
+// ─── INIT ────────────────────────────────────────────────
 window.onload = async () => {
   await checkAuth();
   loadBranches();
   showPage('home');
 };
 
-// ─── AUTH ────────────────────────────────────────────────
+// ─── AUTH ─────────────────────────────────────────────────
 async function checkAuth() {
   try {
     const r = await fetch(API + '/auth/me/', { credentials: 'include' });
-    if (r.ok) {
-      currentUser = await r.json();
-      updateNav();
-    }
+    if (r.ok) { currentUser = await r.json(); updateNav(); }
   } catch (e) {}
 }
 
@@ -40,91 +40,95 @@ async function doLogin() {
   const password = document.getElementById('login-password').value.trim();
   const errEl = document.getElementById('login-error');
   errEl.textContent = '';
-
   const r = await fetch(API + '/auth/login/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ username, password })
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    credentials: 'include', body: JSON.stringify({ username, password })
   });
   const data = await r.json();
   if (!r.ok) { errEl.textContent = data.error; return; }
-  currentUser = data;
-  updateNav();
-  showPage('lk');
-  loadLK();
+  currentUser = data; updateNav(); showPage('lk'); loadLK();
 }
 
 async function doRegister() {
-  const username = document.getElementById('reg-username').value.trim();
-  const password = document.getElementById('reg-password').value.trim();
+  const username  = document.getElementById('reg-username').value.trim();
+  const password  = document.getElementById('reg-password').value.trim();
   const full_name = document.getElementById('reg-fullname').value.trim();
-  const phone = document.getElementById('reg-phone').value.trim();
+  const phone     = document.getElementById('reg-phone').value.trim();
   const errEl = document.getElementById('reg-error');
   errEl.textContent = '';
-
   const r = await fetch(API + '/auth/register/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ username, password, full_name, phone })
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    credentials: 'include', body: JSON.stringify({ username, password, full_name, phone })
   });
   const data = await r.json();
   if (!r.ok) { errEl.textContent = data.error; return; }
-  currentUser = data;
-  updateNav();
-  showPage('lk');
-  loadLK();
+  currentUser = data; updateNav(); showPage('lk'); loadLK();
 }
 
 async function doLogout() {
   await fetch(API + '/auth/logout/', { method: 'POST', credentials: 'include' });
-  currentUser = null;
-  updateNav();
-  showPage('home');
+  currentUser = null; updateNav(); showPage('home');
 }
 
-// ─── BRANCHES ────────────────────────────────────────────
+// ─── BRANCHES ─────────────────────────────────────────────
 async function loadBranches() {
   const r = await fetch(API + '/branches/', { credentials: 'include' });
   const branches = await r.json();
   const container = document.getElementById('branches-list');
   container.innerHTML = '';
   branches.forEach(b => {
-    const loadMap = { low: 'Низкая загруженность', medium: 'Средняя загруженность', high: 'Высокая загруженность' };
-    const loadClass = { low: 'load-low', medium: 'load-medium', high: 'load-high' };
+    const loadMap = { low:'Низкая загруженность', medium:'Средняя загруженность', high:'Высокая загруженность' };
+    const loadClass = { low:'load-low', medium:'load-medium', high:'load-high' };
     container.innerHTML += `
-      <div class="branch-card" onclick="selectBranch(${b.id}, '${esc(b.name)}', '${esc(b.address)}')">
+      <div class="branch-card" onclick="selectBranch(${b.id},'${esc(b.name)}','${esc(b.address)}')">
         <h3>${esc(b.name)}</h3>
         <p class="address">📍 ${esc(b.address)}</p>
-        <span class="load-badge ${loadClass[b.load_level] || 'load-low'}">${loadMap[b.load_level] || ''}</span>
+        <span class="load-badge ${loadClass[b.load_level]||'load-low'}">${loadMap[b.load_level]||''}</span>
       </div>`;
   });
 }
 
-function selectBranch(id, name, address) {
+async function selectBranch(id, name, address) {
   selectedBranch = { id, name, address };
   document.getElementById('slots-branch-name').textContent = name;
   document.getElementById('slots-branch-address').textContent = '📍 ' + address;
+
+  // Загружаем услуги и слоты параллельно
+  const [svcR, slotsR] = await Promise.all([
+    fetch(API + '/services/', { credentials: 'include' }),
+    fetch(API + '/slots/' + id + '/', { credentials: 'include' })
+  ]);
+  allServices = await svcR.json();
+  allSlots = await slotsR.json();
+
+  // Рендерим фильтр услуг на странице слотов
+  renderServiceFilter();
+  renderSlotCalendar('slots-calendar', onSlotSelected);
   showPage('slots');
-  loadSlots(id, 'slots-calendar', onSlotSelected);
 }
 
-// ─── SLOTS ───────────────────────────────────────────────
-async function loadSlots(branchId, containerId, onSelect) {
-  const r = await fetch(API + '/slots/' + branchId + '/', { credentials: 'include' });
-  const slots = await r.json();
+function renderServiceFilter() {
+  let el = document.getElementById('slot-service-filter');
+  if (!el) return;
+  el.innerHTML = '<option value="1">Любая (30 мин)</option>' +
+    allServices.map(s => `<option value="${s.slots_needed}">${esc(s.name)} (${s.duration} мин)</option>`).join('');
+  el.onchange = () => {
+    selectedSlotsNeeded = parseInt(el.value) || 1;
+    renderSlotCalendar('slots-calendar', onSlotSelected);
+  };
+  selectedSlotsNeeded = 1;
+}
+
+// ─── SLOTS ─────────────────────────────────────────────────
+function renderSlotCalendar(containerId, onSelect, slotsNeededOverride) {
+  const needed = slotsNeededOverride || selectedSlotsNeeded || 1;
   const container = document.getElementById(containerId);
   container.innerHTML = '';
 
-  // Group by date
   const byDate = {};
-  slots.forEach(s => {
-    if (!byDate[s.date]) byDate[s.date] = [];
-    byDate[s.date].push(s);
-  });
+  allSlots.forEach(s => { if (!byDate[s.date]) byDate[s.date] = []; byDate[s.date].push(s); });
 
-  const dateNames = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+  const dateNames = ['вс','пн','вт','ср','чт','пт','сб'];
   const monthNames = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
 
   Object.keys(byDate).sort().forEach(dateStr => {
@@ -135,98 +139,99 @@ async function loadSlots(branchId, containerId, onSelect) {
     dayDiv.innerHTML = `<h4>${label}</h4><div class="slots-row"></div>`;
     const row = dayDiv.querySelector('.slots-row');
     byDate[dateStr].forEach(s => {
+      const fits = s.fits && s.fits[String(needed)];
+      const available = s.is_available && fits;
       const btn = document.createElement('button');
-      btn.className = 'slot-btn' + (s.is_available ? '' : ' taken');
+      btn.className = 'slot-btn' + (available ? '' : ' taken');
       btn.textContent = s.time;
-      if (s.is_available) btn.onclick = () => onSelect(s);
+      if (available) btn.onclick = () => onSelect(s);
       row.appendChild(btn);
     });
     container.appendChild(dayDiv);
   });
 
-  if (Object.keys(byDate).length === 0) {
+  if (Object.keys(byDate).length === 0)
     container.innerHTML = '<p class="empty">Нет доступных слотов на ближайшие 14 дней</p>';
-  }
 }
 
 function onSlotSelected(slot) {
-  if (!currentUser) {
-    alert('Для бронирования необходимо войти в аккаунт');
-    showPage('login');
-    return;
-  }
+  if (!currentUser) { alert('Для бронирования необходимо войти'); showPage('login'); return; }
   selectedSlot = slot;
   document.getElementById('book-branch').textContent = selectedBranch.name;
   document.getElementById('book-date').textContent = formatDate(slot.date);
-  document.getElementById('book-time').textContent = slot.time;
-  document.getElementById('book-fullname').value = currentUser.full_name || '';
   document.getElementById('book-error').textContent = '';
-  loadServices();
+  document.getElementById('book-fullname').value = currentUser.full_name || '';
+  renderBookServiceSelect(slot);
   showPage('book');
 }
 
-async function loadServices() {
-  const r = await fetch(API + '/services/', { credentials: 'include' });
-  const services = await r.json();
+function renderBookServiceSelect(slot) {
   const sel = document.getElementById('book-service');
-  sel.innerHTML = services.map(s => `<option value="${s.id}">${s.name} (${s.category})</option>`).join('');
+  // Только услуги, для которых слот подходит
+  sel.innerHTML = allServices
+    .filter(s => slot.fits && slot.fits[String(s.slots_needed)])
+    .map(s => `<option value="${s.id}" data-slots="${s.slots_needed}">${esc(s.name)} (${s.duration} мин)</option>`)
+    .join('');
+  updateBookTime();
+  sel.onchange = updateBookTime;
 }
 
-// ─── BOOKING ─────────────────────────────────────────────
+function updateBookTime() {
+  const sel = document.getElementById('book-service');
+  const opt = sel.options[sel.selectedIndex];
+  const slotsNeeded = parseInt(opt?.dataset?.slots || 1);
+  const [h, m] = selectedSlot.time.split(':').map(Number);
+  const endMin = h * 60 + m + slotsNeeded * 30;
+  const endTime = `${String(Math.floor(endMin/60)).padStart(2,'0')}:${String(endMin%60).padStart(2,'0')}`;
+  document.getElementById('book-time').textContent = `${selectedSlot.time} – ${endTime}`;
+}
+
+// ─── BOOKING ──────────────────────────────────────────────
 async function submitBooking() {
   const full_name = document.getElementById('book-fullname').value.trim();
-  const purpose = document.getElementById('book-purpose').value.trim();
+  const purpose   = document.getElementById('book-purpose').value.trim();
   const service_id = document.getElementById('book-service').value;
   const errEl = document.getElementById('book-error');
   errEl.textContent = '';
-
   if (!full_name) { errEl.textContent = 'Укажите ФИО'; return; }
-
   const r = await fetch(API + '/booking/create/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     body: JSON.stringify({ slot_id: selectedSlot.id, service_id, full_name, purpose })
   });
   const data = await r.json();
   if (!r.ok) { errEl.textContent = data.error; return; }
-
-  showPage('lk');
-  loadLK();
+  showPage('lk'); loadLK();
 }
 
-// ─── LK ──────────────────────────────────────────────────
+// ─── LK ───────────────────────────────────────────────────
 async function loadLK() {
   if (!currentUser) { showPage('login'); return; }
   const r = await fetch(API + '/booking/history/', { credentials: 'include' });
   const bookings = await r.json();
   const container = document.getElementById('lk-list');
   container.innerHTML = '';
-
-  if (!bookings.length) {
-    container.innerHTML = '<p class="empty">У вас пока нет записей</p>';
-    return;
-  }
-
+  if (!bookings.length) { container.innerHTML = '<p class="empty">У вас пока нет записей</p>'; return; }
+  const badgeClass = { active:'badge-active', pending:'badge-pending', cancelled:'badge-cancelled', expired:'badge-expired' };
   bookings.forEach(b => {
     const isActive = b.status === 'active';
-    const badgeClass = { active: 'badge-active', pending: 'badge-pending', cancelled: 'badge-cancelled', expired: 'badge-expired' }[b.status] || '';
+    const timeRange = b.slots_count > 1 ? `${b.time} – ${b.end_time}` : b.time;
     container.innerHTML += `
       <div class="booking-card ${b.status}">
         <div class="booking-header">
           <div class="booking-title">${esc(b.service)}</div>
-          <span class="status-badge ${badgeClass}">${esc(b.status_label)}</span>
+          <span class="status-badge ${badgeClass[b.status]||''}">${esc(b.status_label)}</span>
         </div>
         <div class="booking-meta">
           <div>📅 Дата: <span>${formatDate(b.date)}</span></div>
-          <div>🕐 Время: <span>${b.time}</span></div>
+          <div>🕐 Время: <span>${timeRange}</span></div>
           <div>🏛 Филиал: <span>${esc(b.branch)}</span></div>
           <div>📍 Адрес: <span>${esc(b.branch_address)}</span></div>
           ${b.purpose ? `<div>📝 Цель: <span>${esc(b.purpose)}</span></div>` : ''}
         </div>
         ${isActive ? `
         <div class="booking-actions">
-          <button class="btn-warning" onclick="startReschedule('${b.token}', ${b.slot_id})">Перенести</button>
+          <button class="btn-warning" onclick="startReschedule('${b.token}')">Перенести</button>
           <button class="btn-danger" onclick="cancelBooking('${b.token}')">Отменить</button>
         </div>` : ''}
       </div>`;
@@ -235,51 +240,48 @@ async function loadLK() {
 
 async function cancelBooking(token) {
   if (!confirm('Вы уверены, что хотите отменить запись?')) return;
-  const r = await fetch(API + '/booking/' + token + '/cancel/', {
-    method: 'POST', credentials: 'include'
-  });
+  const r = await fetch(API + '/booking/' + token + '/cancel/', { method:'POST', credentials:'include' });
   const data = await r.json();
   if (!r.ok) { alert(data.error); return; }
   loadLK();
 }
 
-async function startReschedule(token, oldSlotId) {
+async function startReschedule(token) {
   rescheduleToken = token;
-  // Find branch from bookings
   const r = await fetch(API + '/booking/history/', { credentials: 'include' });
   const bookings = await r.json();
-  const booking = bookings.find(b => b.token === token);
-  if (!booking) return;
-  rescheduleOldBranchId = null;
+  rescheduleBooking = bookings.find(b => b.token === token);
+  if (!rescheduleBooking) return;
 
-  // Get branch id from slots endpoint — we need to find branch
-  // We'll just reload slots for the same branch
-  // Find branch id by name from branches list
   const br = await fetch(API + '/branches/', { credentials: 'include' });
   const branches = await br.json();
-  const branch = branches.find(b => b.name === booking.branch);
+  const branch = branches.find(b => b.name === rescheduleBooking.branch);
   if (!branch) { alert('Не удалось определить филиал'); return; }
-  rescheduleOldBranchId = branch.id;
+
+  // Загружаем слоты для переноса
+  const slotsR = await fetch(API + '/slots/' + branch.id + '/', { credentials: 'include' });
+  allSlots = await slotsR.json();
 
   showPage('reschedule');
-  loadSlots(branch.id, 'reschedule-calendar', onRescheduleSlotSelected);
+  renderSlotCalendar('reschedule-calendar', onRescheduleSlotSelected, rescheduleBooking.slots_count);
 }
 
 async function onRescheduleSlotSelected(slot) {
-  if (!confirm(`Перенести запись на ${formatDate(slot.date)} в ${slot.time}?`)) return;
+  const [h, m] = slot.time.split(':').map(Number);
+  const needed = rescheduleBooking?.slots_count || 1;
+  const endMin = h * 60 + m + needed * 30;
+  const endTime = `${String(Math.floor(endMin/60)).padStart(2,'0')}:${String(endMin%60).padStart(2,'0')}`;
+  if (!confirm(`Перенести запись на ${formatDate(slot.date)} в ${slot.time}–${endTime}?`)) return;
   const r = await fetch(API + '/booking/' + rescheduleToken + '/reschedule/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ slot_id: slot.id })
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    credentials: 'include', body: JSON.stringify({ slot_id: slot.id })
   });
   const data = await r.json();
   if (!r.ok) { alert(data.error); return; }
-  showPage('lk');
-  loadLK();
+  showPage('lk'); loadLK();
 }
 
-// ─── NAVIGATION ──────────────────────────────────────────
+// ─── NAVIGATION ───────────────────────────────────────────
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
   document.getElementById('page-' + name).style.display = 'block';
@@ -287,14 +289,12 @@ function showPage(name) {
   window.scrollTo(0, 0);
 }
 
-// ─── UTILS ───────────────────────────────────────────────
+// ─── UTILS ────────────────────────────────────────────────
 function esc(str) {
-  if (!str) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
 function formatDate(dateStr) {
-  const monthNames = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  const m = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
   const d = new Date(dateStr + 'T00:00:00');
-  return `${d.getDate()} ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+  return `${d.getDate()} ${m[d.getMonth()]} ${d.getFullYear()}`;
 }
